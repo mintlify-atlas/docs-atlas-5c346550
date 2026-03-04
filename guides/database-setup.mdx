@@ -356,7 +356,7 @@ public static async Task SeedDatabaseAsync(IServiceProvider services)
     }
 
     // Create admin user
-    var adminEmail = "admin@xgp.com";
+    var adminEmail = "admin@xgpphoto.local";
     var adminUser = await userManager.FindByEmailAsync(adminEmail);
     
     if (adminUser == null)
@@ -368,7 +368,7 @@ public static async Task SeedDatabaseAsync(IServiceProvider services)
             EmailConfirmed = true
         };
         
-        var result = await userManager.CreateAsync(adminUser, "Admin123!");
+        var result = await userManager.CreateAsync(adminUser, "XgpPhoto!2025$Secure");
         
         if (result.Succeeded)
         {

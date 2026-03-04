@@ -45,15 +45,15 @@ mode: custom
 Content-Type: application/json
 
 {
-  "email": "admin@xgp.com",
-  "password": "your-password"
+  "email": "admin@xgpphoto.local",
+  "password": "XgpPhoto!2025$Secure",
+  "clientId": "xgp-web",
+  "clientSecret": "Y0urCl13ntS3cret!2025"
 }
 
 → 200 OK
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "email": "admin@xgp.com",
-  "role": "Admin"
+  "token": "eyJhbGciOiJIUzI1NiIs..."
 }`}
             </pre>
           </div>
@@ -121,8 +121,10 @@ Content-Type: application/json
       curl -X POST http://localhost:5000/api/auth/login \
         -H "Content-Type: application/json" \
         -d '{
-          "email": "admin@xgp.com",
-          "password": "Admin123!"
+          "email": "admin@xgpphoto.local",
+          "password": "XgpPhoto!2025$Secure",
+          "clientId": "xgp-web",
+          "clientSecret": "Y0urCl13ntS3cret!2025"
         }'
       ```
       

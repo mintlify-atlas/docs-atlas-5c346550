@@ -38,8 +38,8 @@ The XGP Photo API uses JWT (JSON Web Tokens) for authentication combined with a 
 
     ```json
     {
-      "email": "admin@xgp.com",
-      "password": "YourPassword123!",
+      "email": "admin@xgpphoto.local",
+      "password": "XgpPhoto!2025$Secure",
       "clientId": "xgp-web",
       "clientSecret": "Y0urCl13ntS3cret!2025"
     }
@@ -311,8 +311,8 @@ public static IServiceCollection AddAuthInfrastructure(
 curl -X POST http://localhost:5000/api/Auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@xgp.com",
-    "password": "Admin123!",
+    "email": "admin@xgpphoto.local",
+    "password": "XgpPhoto!2025$Secure",
     "clientId": "xgp-web",
     "clientSecret": "Y0urCl13ntS3cret!2025"
   }'
