@@ -1,0 +1,553 @@
+---
+title: 'Working with Projects'
+description: 'Learn how to create, read, update, and manage photography projects in the XGP Photo API'
+---
+
+## Overview
+
+The XGP Photo API provides a complete project management system for photography portfolios. Each project contains:
+
+- **Project metadata** - Title, description, banner information, and main image
+- **Project details** - Collection of additional images associated with the project
+- **Status tracking** - Active/inactive status and timestamps
+
+## Data Models
+
+### Project Entity
+
+The core `Project` entity represents a photography project:
+
+```csharp Domain/Entities/Project.cs
+public class Project
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public string BannerClickTitle { get; set; } = default!;
+    public string BannerClickDescription { get; set; } = default!;
+    public string Title { get; set; } = default!;
+    public string Description { get; set; } = default!;
+    public string ImageUrl { get; set; } = default!;
+
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifiedDate { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    // One-to-Many relationship with ProjectDetails
+    public ICollection<ProjectDetail> Details { get; set; } = new List<ProjectDetail>();
+}
+```
+
+### Project Detail Entity
+
+Each project can have multiple detail images:
+
+```csharp Domain/Entities/ProjectDetail.cs
+public class ProjectDetail
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ProjectId { get; set; };
+    public string ImageUrl { get; set; } = default!;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+    public DateTime? ModifiedDate { get; set; }
+
+    // Inverse relationship
+    public Project Project { get; set; } = default!;
+}
+```
+
+<Note>
+  The relationship is configured with cascade delete, so deleting a project will automatically delete all its details.
+</Note>
+
+## API Endpoints
+
+### Get All Projects
+
+Retrieve all active projects with their details.
+
+**Endpoint:** `GET /api/Projects`
+
+**Authorization:** Anonymous (no authentication required)
+
+```bash
+curl -X GET http://localhost:5000/api/Projects
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "title": "Urban Landscapes",
+    "description": "A collection of cityscapes and architectural photography",
+    "imageUrl": "https://example.com/images/urban-main.jpg",
+    "isActive": true,
+    "createDate": "2024-03-15T10:30:00Z",
+    "details": [
+      {
+        "id": "5fa85f64-5717-4562-b3fc-2c963f66afa7",
+        "imageUrl": "https://example.com/images/urban-1.jpg",
+        "isActive": true
+      },
+      {
+        "id": "6fa85f64-5717-4562-b3fc-2c963f66afa8",
+        "imageUrl": "https://example.com/images/urban-2.jpg",
+        "isActive": true
+      }
+    ]
+  }
+]
+```
+
+### Get Project by ID
+
+Retrieve a specific project with all its details.
+
+**Endpoint:** `GET /api/Projects/{id}`
+
+**Authorization:** Anonymous
+
+```bash
+curl -X GET http://localhost:5000/api/Projects/3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+**Response:**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "title": "Urban Landscapes",
+  "description": "A collection of cityscapes and architectural photography",
+  "imageUrl": "https://example.com/images/urban-main.jpg",
+  "isActive": true,
+  "createDate": "2024-03-15T10:30:00Z",
+  "details": [...]
+}
+```
+
+**Error Response (404):**
+
+```json
+{
+  "message": "No se encontró el proyecto con Id 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+}
+```
+
+### Create Project
+
+Create a new photography project.
+
+**Endpoint:** `POST /api/Projects`
+
+**Authorization:** Required (Admin role)
+
+```bash
+curl -X POST http://localhost:5000/api/Projects \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Nature Photography",
+    "description": "Wildlife and landscape photography from national parks",
+    "imageUrl": "https://example.com/images/nature-main.jpg",
+    "bannerClickTitle": "Explore Nature",
+    "bannerClickDescription": "Discover the beauty of the natural world",
+    "isActive": true,
+    "details": [
+      {
+        "imageUrl": "https://example.com/images/nature-1.jpg",
+        "isActive": true
+      },
+      {
+        "imageUrl": "https://example.com/images/nature-2.jpg",
+        "isActive": true
+      }
+    ]
+  }'
+```
+
+<Warning>
+  Only users with the **Admin** role can create projects. See [Authentication](/guides/authentication) for details.
+</Warning>
+
+**Request DTO:**
+
+```csharp Application/DTOs/Projects/ProjectCreateDto.cs
+public class ProjectCreateDto
+{
+    [Required, MaxLength(200)]
+    public string Title { get; set; } = default!;
+
+    [MaxLength(1000)]
+    public string? Description { get; set; }
+
+    [Required, MaxLength(500)]
+    public string ImageUrl { get; set; } = default!;
+
+    [MaxLength(200)]
+    public string? BannerClickTitle { get; set; }
+
+    [MaxLength(1000)]
+    public string? BannerClickDescription { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public List<ProjectDetailCreateDto> Details { get; set; } = new();
+}
+
+public class ProjectDetailCreateDto
+{
+    [Required, MaxLength(500)]
+    public string ImageUrl { get; set; } = default!;
+
+    public bool IsActive { get; set; } = true;
+}
+```
+
+### Update Project
+
+Update an existing project and its details.
+
+**Endpoint:** `PUT /api/Projects/{id}`
+
+**Authorization:** Required (Admin role)
+
+```bash
+curl -X PUT http://localhost:5000/api/Projects/3fa85f64-5717-4562-b3fc-2c963f66afa6 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "title": "Urban Landscapes - Updated",
+    "description": "Updated description",
+    "imageUrl": "https://example.com/images/urban-main-v2.jpg",
+    "isActive": true,
+    "details": [...]
+  }'
+```
+
+<Note>
+  The update operation intelligently handles details: existing details are updated, new ones are added, and missing ones are removed.
+</Note>
+
+## Implementation Details
+
+### Projects Controller
+
+The controller exposes the API endpoints:
+
+```csharp Api/Controllers/ProjectsController.cs
+[ApiController]
+[Route("api/[controller]")]
+public class ProjectsController : ControllerBase
+{
+    private readonly IProjectService _service;
+    private readonly ILogger<ProjectsController> _logger;
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAll()
+    {
+        var result = await _service.GetAllAsync();
+        return Ok(result);
+    }
+
+    [HttpGet("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var result = await _service.GetByIdAsync(id);
+
+        if (result is null)
+            return NotFound(new { message = $"No se encontró el proyecto con Id {id}" });
+
+        return Ok(result);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Create([FromBody] ProjectCreateDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var result = await _service.CreateAsync(dto);
+        _logger.LogInformation("Proyecto {Title} creado correctamente.", dto.Title);
+        return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] ProjectUpdateDto dto)
+    {
+        if (id != dto.Id)
+            return BadRequest("El ID del cuerpo no coincide con la URL.");
+
+        var result = await _service.UpdateAsync(dto);
+        if (result == null)
+            return NotFound("Proyecto no encontrado.");
+
+        _logger.LogInformation("Proyecto {Id} actualizado correctamente.", id);
+        return Ok(result);
+    }
+}
+```
+
+### Project Service
+
+The service layer handles business logic:
+
+```csharp Application/Services/ProjectService.cs
+public class ProjectService : IProjectService
+{
+    private readonly IProjectRepository _repository;
+
+    public async Task<ProjectDto> CreateAsync(ProjectCreateDto dto)
+    {
+        var project = new Project
+        {
+            Title = dto.Title,
+            Description = dto.Description ?? string.Empty,
+            ImageUrl = dto.ImageUrl,
+            BannerClickTitle = dto.BannerClickTitle ?? string.Empty,
+            BannerClickDescription = dto.BannerClickDescription ?? string.Empty,
+            IsActive = dto.IsActive,
+            CreateDate = DateTime.UtcNow,
+            Details = dto.Details.Select(d => new ProjectDetail
+            {
+                ImageUrl = d.ImageUrl,
+                IsActive = d.IsActive,
+                CreateDate = DateTime.UtcNow
+            }).ToList()
+        };
+
+        await _repository.AddAsync(project);
+        await _repository.SaveChangesAsync();
+
+        return MapToDto(project);
+    }
+}
+```
+
+### Update Logic
+
+The update method handles detail synchronization:
+
+```csharp Application/Services/ProjectService.cs (UpdateAsync)
+public async Task<ProjectDto?> UpdateAsync(ProjectUpdateDto dto)
+{
+    var project = await _repository.GetByIdAsync(dto.Id);
+    if (project == null) return null;
+
+    // Update project fields
+    project.Title = dto.Title;
+    project.Description = dto.Description ?? string.Empty;
+    project.ImageUrl = dto.ImageUrl;
+    project.BannerClickTitle = dto.BannerClickTitle ?? string.Empty;
+    project.BannerClickDescription = dto.BannerClickDescription ?? string.Empty;
+    project.IsActive = dto.IsActive;
+    project.ModifiedDate = DateTime.UtcNow;
+
+    // Update details
+    var existingDetails = project.Details.ToList();
+    project.Details.Clear();
+
+    foreach (var detailDto in dto.Details)
+    {
+        var existing = existingDetails.FirstOrDefault(d => d.ImageUrl == detailDto.ImageUrl);
+        if (existing != null)
+        {
+            // Update existing detail
+            existing.IsActive = detailDto.IsActive;
+            existing.ModifiedDate = DateTime.UtcNow;
+            project.Details.Add(existing);
+        }
+        else
+        {
+            // Add new detail
+            project.Details.Add(new ProjectDetail
+            {
+                ImageUrl = detailDto.ImageUrl,
+                IsActive = detailDto.IsActive,
+                CreateDate = DateTime.UtcNow
+            });
+        }
+    }
+
+    await _repository.UpdateAsync(project);
+    await _repository.SaveChangesAsync();
+
+    return MapToDto(project);
+}
+```
+
+<Note>
+  The update logic uses `ImageUrl` as a matching key to determine if a detail is new or existing. Details not included in the update request are removed.
+</Note>
+
+## Database Configuration
+
+The database relationships are configured in the `ApplicationDbContext`:
+
+```csharp Data/ApplicationDbContext.cs
+protected override void OnModelCreating(ModelBuilder builder)
+{
+    base.OnModelCreating(builder);
+
+    builder.Entity<Project>(entity =>
+    {
+        entity.ToTable("Projects");
+        entity.HasKey(p => p.Id);
+
+        entity.Property(p => p.Title).IsRequired().HasMaxLength(200);
+        entity.Property(p => p.Description).HasMaxLength(1000);
+        entity.Property(p => p.ImageUrl).HasMaxLength(500);
+
+        entity.HasMany(p => p.Details)
+              .WithOne(d => d.Project)
+              .HasForeignKey(d => d.ProjectId)
+              .OnDelete(DeleteBehavior.Cascade);
+    });
+
+    builder.Entity<ProjectDetail>(entity =>
+    {
+        entity.ToTable("ProjectDetails");
+        entity.HasKey(d => d.Id);
+        entity.Property(d => d.ImageUrl).IsRequired().HasMaxLength(500);
+    });
+}
+```
+
+## Testing with Examples
+
+### Create a Complete Project
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl -X POST http://localhost:5000/api/Projects \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "title": "Portrait Series",
+        "description": "Professional portrait photography",
+        "imageUrl": "https://cdn.example.com/portraits/main.jpg",
+        "bannerClickTitle": "View Portraits",
+        "bannerClickDescription": "Explore our portrait collection",
+        "isActive": true,
+        "details": [
+          {"imageUrl": "https://cdn.example.com/portraits/img1.jpg", "isActive": true},
+          {"imageUrl": "https://cdn.example.com/portraits/img2.jpg", "isActive": true},
+          {"imageUrl": "https://cdn.example.com/portraits/img3.jpg", "isActive": true}
+        ]
+      }'
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const createProject = async () => {
+      const response = await fetch('http://localhost:5000/api/Projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: 'Portrait Series',
+          description: 'Professional portrait photography',
+          imageUrl: 'https://cdn.example.com/portraits/main.jpg',
+          bannerClickTitle: 'View Portraits',
+          bannerClickDescription: 'Explore our portrait collection',
+          isActive: true,
+          details: [
+            {imageUrl: 'https://cdn.example.com/portraits/img1.jpg', isActive: true},
+            {imageUrl: 'https://cdn.example.com/portraits/img2.jpg', isActive: true},
+            {imageUrl: 'https://cdn.example.com/portraits/img3.jpg', isActive: true}
+          ]
+        })
+      });
+      
+      return await response.json();
+    };
+    ```
+  </Tab>
+  
+  <Tab title="C#">
+    ```csharp
+    var client = new HttpClient();
+    client.DefaultRequestHeaders.Authorization = 
+        new AuthenticationHeaderValue("Bearer", token);
+
+    var project = new ProjectCreateDto
+    {
+        Title = "Portrait Series",
+        Description = "Professional portrait photography",
+        ImageUrl = "https://cdn.example.com/portraits/main.jpg",
+        BannerClickTitle = "View Portraits",
+        BannerClickDescription = "Explore our portrait collection",
+        IsActive = true,
+        Details = new List<ProjectDetailCreateDto>
+        {
+            new() { ImageUrl = "https://cdn.example.com/portraits/img1.jpg", IsActive = true },
+            new() { ImageUrl = "https://cdn.example.com/portraits/img2.jpg", IsActive = true },
+            new() { ImageUrl = "https://cdn.example.com/portraits/img3.jpg", IsActive = true }
+        }
+    };
+
+    var response = await client.PostAsJsonAsync(
+        "http://localhost:5000/api/Projects", project);
+    var result = await response.Content.ReadFromJsonAsync<ProjectDto>();
+    ```
+  </Tab>
+</Tabs>
+
+## Validation Rules
+
+<Warning>
+  **Field Constraints**
+  
+  - **Title**: Required, max 200 characters
+  - **Description**: Optional, max 1000 characters
+  - **ImageUrl**: Required, max 500 characters
+  - **BannerClickTitle**: Optional, max 200 characters
+  - **BannerClickDescription**: Optional, max 1000 characters
+  - **Detail ImageUrl**: Required, max 500 characters
+</Warning>
+
+## Common Patterns
+
+### Fetching Active Projects Only
+
+The repository filters active projects:
+
+```csharp
+public async Task<IEnumerable<Project>> GetAllAsync()
+{
+    return await _context.Projects
+        .Include(p => p.Details)
+        .Where(p => p.IsActive)
+        .ToListAsync();
+}
+```
+
+### Soft Delete Pattern
+
+Instead of deleting projects, set `IsActive = false`:
+
+```csharp
+project.IsActive = false;
+project.ModifiedDate = DateTime.UtcNow;
+await _repository.UpdateAsync(project);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Learn about JWT authentication and roles
+  </Card>
+  <Card title="Database Setup" icon="database" href="/guides/database-setup">
+    Configure PostgreSQL and migrations
+  </Card>
+</CardGroup>

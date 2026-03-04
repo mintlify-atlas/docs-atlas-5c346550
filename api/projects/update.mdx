@@ -1,0 +1,263 @@
+---
+title: 'Update Project'
+description: 'Update an existing photography project'
+---
+
+## Endpoint
+
+```
+PUT /api/projects/{id}
+```
+
+## Authentication
+
+**Required**: Admin role
+
+This endpoint requires a valid JWT token with the `Admin` role. Include the token in the `Authorization` header:
+
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Description
+
+Updates an existing photography project and its detail images. The project ID in the URL must match the ID in the request body.
+
+## Path Parameters
+
+<ParamField path="id" type="string (GUID)" required>
+  The unique identifier of the project to update.
+  
+  Format: `3fa85f64-5717-4562-b3fc-2c963f66afa6`
+</ParamField>
+
+## Request Body
+
+<ParamField body="id" type="string (GUID)" required>
+  Project ID. Must match the ID in the URL path.
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  Project title. Maximum length: 200 characters.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Project description. Maximum length: 1000 characters. Optional.
+</ParamField>
+
+<ParamField body="imageUrl" type="string" required>
+  URL of the main project cover image. Maximum length: 500 characters.
+</ParamField>
+
+<ParamField body="bannerClickTitle" type="string">
+  Title displayed when the project banner is clicked. Maximum length: 200 characters. Optional.
+</ParamField>
+
+<ParamField body="bannerClickDescription" type="string">
+  Description displayed when the project banner is clicked. Maximum length: 1000 characters. Optional.
+</ParamField>
+
+<ParamField body="isActive" type="boolean" default="true">
+  Whether the project is active and visible. Defaults to `true`.
+</ParamField>
+
+<ParamField body="details" type="array" default="[]">
+  Array of detail objects containing project images. This replaces all existing details.
+  
+  <Expandable title="ProjectDetailCreateDto properties">
+    <ParamField body="imageUrl" type="string" required>
+      URL of the detail image. Maximum length: 500 characters.
+    </ParamField>
+    
+    <ParamField body="isActive" type="boolean" default="true">
+      Whether the detail is active. Defaults to `true`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string (GUID)">
+  Unique identifier for the project.
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Project title.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Project description.
+</ResponseField>
+
+<ResponseField name="imageUrl" type="string">
+  URL of the main project image.
+</ResponseField>
+
+<ResponseField name="isActive" type="boolean">
+  Indicates if the project is active.
+</ResponseField>
+
+<ResponseField name="createDate" type="string (datetime)">
+  ISO 8601 timestamp when the project was originally created.
+</ResponseField>
+
+<ResponseField name="details" type="array">
+  Array of project detail objects.
+  
+  <Expandable title="ProjectDetailDto properties">
+    <ResponseField name="id" type="string (GUID)">
+      Unique identifier for the detail.
+    </ResponseField>
+    
+    <ResponseField name="imageUrl" type="string">
+      URL of the detail image.
+    </ResponseField>
+    
+    <ResponseField name="isActive" type="boolean">
+      Indicates if the detail is active.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X PUT http://localhost:5000/api/projects/3fa85f64-5717-4562-b3fc-2c963f66afa6 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "title": "Wedding Photography 2024 - Updated",
+    "description": "Updated collection of elegant wedding photography featuring romantic moments and beautiful ceremonies",
+    "imageUrl": "https://example.com/images/wedding-cover-new.jpg",
+    "bannerClickTitle": "View Wedding Gallery",
+    "bannerClickDescription": "Browse our complete wedding photography collection",
+    "isActive": true,
+    "details": [
+      {
+        "imageUrl": "https://example.com/images/wedding-ceremony.jpg",
+        "isActive": true
+      },
+      {
+        "imageUrl": "https://example.com/images/wedding-reception.jpg",
+        "isActive": true
+      },
+      {
+        "imageUrl": "https://example.com/images/wedding-portraits.jpg",
+        "isActive": true
+      },
+      {
+        "imageUrl": "https://example.com/images/wedding-details.jpg",
+        "isActive": false
+      }
+    ]
+  }'
+```
+
+## Example Response
+
+### Success (200 OK)
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "title": "Wedding Photography 2024 - Updated",
+  "description": "Updated collection of elegant wedding photography featuring romantic moments and beautiful ceremonies",
+  "imageUrl": "https://example.com/images/wedding-cover-new.jpg",
+  "isActive": true,
+  "createDate": "2024-10-16T12:00:00Z",
+  "details": [
+    {
+      "id": "di5j2b35-da8b-a6kj-fa0h-k6dm7l7m56gk3",
+      "imageUrl": "https://example.com/images/wedding-ceremony.jpg",
+      "isActive": true
+    },
+    {
+      "id": "ej6k3c46-eb9c-b7lk-gb1i-l7en8m8n67hl4",
+      "imageUrl": "https://example.com/images/wedding-reception.jpg",
+      "isActive": true
+    },
+    {
+      "id": "fk7l4d57-fc0d-c8ml-hc2j-m8fo9n9o78im5",
+      "imageUrl": "https://example.com/images/wedding-portraits.jpg",
+      "isActive": true
+    },
+    {
+      "id": "gl8m5e68-gd1e-d9nm-id3k-n9gp0o0p89jn6",
+      "imageUrl": "https://example.com/images/wedding-details.jpg",
+      "isActive": false
+    }
+  ]
+}
+```
+
+### Error (400 Bad Request)
+
+Returned when the ID in the URL doesn't match the ID in the request body:
+
+```json
+"El ID del cuerpo no coincide con la URL."
+```
+
+Returned when validation fails:
+
+```json
+{
+  "errors": {
+    "Id": [
+      "The Id field is required."
+    ],
+    "Title": [
+      "The Title field is required."
+    ],
+    "ImageUrl": [
+      "The ImageUrl field is required."
+    ]
+  },
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400
+}
+```
+
+### Error (404 Not Found)
+
+Returned when no project exists with the specified ID:
+
+```json
+"Proyecto no encontrado."
+```
+
+### Error (401 Unauthorized)
+
+Returned when no authentication token is provided:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}
+```
+
+### Error (403 Forbidden)
+
+Returned when the authenticated user does not have the Admin role:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+  "title": "Forbidden",
+  "status": 403
+}
+```
+
+## Notes
+
+- Admin role required - obtain token via [/api/auth/login](/api/auth/login)
+- The project ID in the URL path **must** match the `id` field in the request body
+- Updating a project replaces all existing detail images with the new details provided
+- The `createDate` remains unchanged; only `modifiedDate` is updated internally
+- Update operations are logged with the project ID for audit purposes
+- To remove all detail images, pass an empty `details` array
+- The `isActive` flag can be used to soft-delete projects without removing them from the database

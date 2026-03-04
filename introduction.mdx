@@ -1,0 +1,228 @@
+---
+title: Introduction
+description: Welcome to the XGP Photo API - A modern REST API for managing photography projects with secure JWT authentication
+---
+
+## Overview
+
+The XGP Photo API is a production-ready REST API built with ASP.NET Core 9.0 that provides a complete backend solution for managing photography projects and their associated image galleries. The API features secure JWT-based authentication, role-based access control, and a clean architecture designed for scalability.
+
+<Note>
+  This API uses PostgreSQL as its database and automatically handles migrations and seeding during startup.
+</Note>
+
+## Key Features
+
+### Secure Authentication
+- **JWT Bearer Token Authentication** - Industry-standard token-based authentication
+- **Client Credential Validation** - Multiple client applications supported with unique credentials
+- **Role-Based Authorization** - Admin and user roles with granular permissions
+- **ASP.NET Core Identity Integration** - Built on Microsoft's proven identity framework
+
+### Project Management
+- **CRUD Operations** - Full create, read, update capabilities for photography projects
+- **Project Details** - Support for multiple images per project with metadata
+- **Active Status Tracking** - Soft delete functionality with IsActive flags
+- **Relationship Management** - One-to-many relationships between projects and details
+
+### Developer Experience
+- **Swagger/OpenAPI Documentation** - Interactive API documentation in development mode
+- **Clean Architecture** - Separation of concerns with Domain, Application, Infrastructure, and API layers
+- **Entity Framework Core** - Code-first database approach with migration support
+- **Automatic Database Seeding** - Default admin user created on first run
+
+## Architecture
+
+The API follows Clean Architecture principles with clear separation of concerns:
+
+```
+xgp-photo-api/
+├── Api/
+│   └── Controllers/          # HTTP endpoints
+├── Application/
+│   └── DTOs/                # Data transfer objects
+├── Domain/
+│   └── Entities/            # Core business entities
+├── Infrastructure/
+│   ├── Data/                # Database context
+│   ├── Identity/            # JWT services
+│   ├── Repositories/        # Data access
+│   └── Extensions/          # Dependency injection
+└── Program.cs               # Application entry point
+```
+
+### Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="Framework" icon="code">
+    ASP.NET Core 9.0
+  </Card>
+  <Card title="Database" icon="database">
+    PostgreSQL with EF Core 9.0
+  </Card>
+  <Card title="Authentication" icon="shield-halved">
+    JWT Bearer + ASP.NET Identity
+  </Card>
+  <Card title="API Documentation" icon="book">
+    Swagger/OpenAPI 3.0
+  </Card>
+</CardGroup>
+
+## Data Models
+
+The API manages two primary entities:
+
+### Project Entity
+
+Represents a photography project with banner information and metadata.
+
+```csharp Program.cs
+public class Project
+{
+    public Guid Id { get; set; }
+    public string BannerClickTitle { get; set; }
+    public string BannerClickDescription { get; set; }
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public string ImageUrl { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifiedDate { get; set; }
+    public bool IsActive { get; set; }
+    public ICollection<ProjectDetail> Details { get; set; }
+}
+```
+
+### ProjectDetail Entity
+
+Represents individual images within a project.
+
+```csharp Program.cs
+public class ProjectDetail
+{
+    public Guid Id { get; set; }
+    public Guid ProjectId { get; set; }
+    public string ImageUrl { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreateDate { get; set; }
+    public DateTime? ModifiedDate { get; set; }
+    public Project Project { get; set; }
+}
+```
+
+## API Endpoints
+
+### Authentication Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/auth/login` | Authenticate and receive JWT token | No |
+
+### Project Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/projects` | Get all active projects | No |
+| GET | `/api/projects/{id}` | Get project by ID | No |
+| POST | `/api/projects` | Create new project | Admin only |
+| PUT | `/api/projects/{id}` | Update existing project | Admin only |
+
+<Warning>
+  Admin role is required for creating and updating projects. Public read access is available for all active projects.
+</Warning>
+
+## Security Features
+
+### JWT Token Configuration
+
+The API uses industry-standard JWT tokens with configurable settings:
+
+```json appsettings.json
+{
+  "Jwt": {
+    "Issuer": "XgpPhotoApi",
+    "Audience": "XgpPhotoClients",
+    "Key": "your-secret-key-here",
+    "ExpMinutes": 60
+  }
+}
+```
+
+### Client Authentication
+
+Multiple client applications can be configured with unique credentials:
+
+```json appsettings.json
+{
+  "AuthClients": [
+    {
+      "ClientId": "xgp-web",
+      "ClientSecret": "your-client-secret",
+      "Description": "Frontend Web application"
+    }
+  ]
+}
+```
+
+### Role-Based Access Control
+
+The API implements role claims in JWT tokens for fine-grained authorization:
+
+```csharp Program.cs
+claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+claims.AddRange(roles.Select(r => new Claim("role", r)));
+```
+
+<Note>
+  Both standard .NET role claims and JWT role claims are included for maximum compatibility with different client types.
+</Note>
+
+## Database Management
+
+### Automatic Migrations
+
+The API automatically applies Entity Framework migrations on startup:
+
+```csharp Program.cs
+await db.Database.MigrateAsync();
+```
+
+### Default Admin User
+
+A default administrator account is created during first run:
+
+- **Email**: `admin@xgpphoto.local`
+- **Password**: `XgpPhoto!2025$Secure`
+- **Role**: Admin
+
+<Warning>
+  Change the default admin credentials in production environments. Update the password in `DatabaseSeeder.cs`.
+</Warning>
+
+## CORS Configuration
+
+The API is configured to allow requests from any origin in development:
+
+```csharp Program.cs
+app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
+```
+
+<Note>
+  For production deployments, configure specific allowed origins for security.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get the API running in minutes
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Learn how to authenticate and use JWT tokens
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore all available endpoints
+  </Card>
+  <Card title="Deployment" icon="server" href="/guides/deployment">
+    Deploy to production environments
+  </Card>
+</CardGroup>

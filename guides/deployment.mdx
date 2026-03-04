@@ -1,0 +1,694 @@
+---
+title: 'Deployment Guide'
+description: 'Deploy the XGP Photo API using Docker and docker-compose with PostgreSQL'
+---
+
+## Overview
+
+The XGP Photo API is containerized using Docker for easy deployment. This guide covers:
+
+- Docker containerization
+- Multi-stage builds for optimization
+- Docker Compose orchestration
+- Environment configuration
+- Production deployment considerations
+
+## Prerequisites
+
+- Docker 20.10 or later
+- Docker Compose 2.0 or later
+- Basic understanding of Docker concepts
+
+<Note>
+  The API uses **.NET 9.0** runtime. The Docker images handle all dependencies automatically.
+</Note>
+
+## Docker Configuration
+
+### Dockerfile
+
+The API uses a multi-stage Docker build for optimal image size:
+
+```dockerfile Dockerfile
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore
+RUN dotnet publish -c Release -o /app/publish
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+ENTRYpoint ["dotnet", "xgp-photo-api.dll"]
+```
+
+### Multi-Stage Build Benefits
+
+<Accordion title="Smaller Image Size">
+  The final image only contains the runtime and compiled application, not the SDK or source code.
+  
+  - Build stage: ~1.5 GB (with SDK)
+  - Final image: ~200 MB (runtime only)
+</Accordion>
+
+<Accordion title="Better Security">
+  No development tools or source code in production image reduces attack surface.
+</Accordion>
+
+<Accordion title="Faster Deployments">
+  Smaller images mean faster pulls and deployments.
+</Accordion>
+
+### Build the Docker Image
+
+```bash
+# Build the image
+docker build -t xgp-photo-api:latest .
+
+# Verify the image
+docker images | grep xgp-photo-api
+
+# Run the container
+docker run -d -p 5000:8080 \
+  -e ConnectionStrings__DefaultConnection="Host=host.docker.internal;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword" \
+  --name xgp-api \
+  xgp-photo-api:latest
+```
+
+<Warning>
+  Use `host.docker.internal` on Windows/Mac to connect to PostgreSQL running on the host. On Linux, use `--network host` or the actual IP address.
+</Warning>
+
+## Docker Compose Setup
+
+### Complete Configuration
+
+The `docker-compose.yml` orchestrates both the API and PostgreSQL:
+
+```yaml docker-compose.yml
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-xgp
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: tuPassword
+      POSTGRES_DB: XgpPhotoDb
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256 --auth-local=scram-sha-256'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - xgp_network
+
+  xgp-api:
+    build: .
+    container_name: xgp-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword"
+      Jwt__Issuer: "XgpPhotoApi"
+      Jwt__Audience: "XgpPhotoClients"
+      Jwt__Key: "clave-super-segura-y-larga-para-firmar-jwt"
+      Jwt__ExpMinutes: "60"
+      AuthClients__0__ClientId: "xgp-web"
+      AuthClients__0__ClientSecret: "Y0urCl13ntS3cret!2025"
+      AuthClients__0__Description: "Frontend local"
+    depends_on:
+      - postgres
+    networks:
+      - xgp_network
+
+volumes:
+  pgdata:
+
+networks:
+  xgp_network:
+    driver: bridge
+```
+
+### Service Breakdown
+
+<Tabs>
+  <Tab title="PostgreSQL Service">
+    ```yaml
+    postgres:
+      image: postgres:16              # Official PostgreSQL image
+      container_name: postgres-xgp    # Fixed container name
+      restart: always                 # Auto-restart on failure
+      ports:
+        - "5432:5432"                 # Expose to host
+      environment:
+        POSTGRES_USER: postgres       # Database user
+        POSTGRES_PASSWORD: tuPassword # User password
+        POSTGRES_DB: XgpPhotoDb       # Initial database
+        POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
+      volumes:
+        - pgdata:/var/lib/postgresql/data  # Persistent storage
+      networks:
+        - xgp_network                 # Shared network
+    ```
+    
+    **Key Points:**
+    - Data persists in `pgdata` volume
+    - Uses SCRAM-SHA-256 authentication
+    - Accessible at `postgres:5432` within network
+  </Tab>
+  
+  <Tab title="API Service">
+    ```yaml
+    xgp-api:
+      build: .                        # Build from Dockerfile
+      container_name: xgp-api         # Fixed container name
+      ports:
+        - "5000:8080"                 # Map host:5000 to container:8080
+      environment:
+        ASPNETCORE_ENVIRONMENT: Development
+        ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;..."
+        Jwt__Issuer: "XgpPhotoApi"
+        Jwt__Audience: "XgpPhotoClients"
+        Jwt__Key: "clave-super-segura-y-larga-para-firmar-jwt"
+        Jwt__ExpMinutes: "60"
+        AuthClients__0__ClientId: "xgp-web"
+        AuthClients__0__ClientSecret: "Y0urCl13ntS3cret!2025"
+      depends_on:
+        - postgres                    # Wait for PostgreSQL
+      networks:
+        - xgp_network
+    ```
+    
+    **Key Points:**
+    - Builds from local Dockerfile
+    - Accessible at `http://localhost:5000`
+    - All configuration via environment variables
+  </Tab>
+  
+  <Tab title="Volumes & Networks">
+    ```yaml
+    volumes:
+      pgdata:                         # Named volume for PostgreSQL data
+    
+    networks:
+      xgp_network:
+        driver: bridge                # Bridge network for inter-container communication
+    ```
+    
+    **Key Points:**
+    - `pgdata` persists database data across container restarts
+    - `xgp_network` allows API to connect to PostgreSQL by service name
+  </Tab>
+</Tabs>
+
+## Deployment Commands
+
+### Start Services
+
+<Steps>
+  <Step title="Start in Detached Mode">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    Builds images (if needed) and starts containers in the background.
+  </Step>
+  
+  <Step title="Verify Services">
+    ```bash
+    # Check running containers
+    docker-compose ps
+    
+    # Expected output:
+    # NAME           IMAGE              STATUS    PORTS
+    # postgres-xgp   postgres:16        Up        0.0.0.0:5432->5432/tcp
+    # xgp-api        xgp-photo-api      Up        0.0.0.0:5000->8080/tcp
+    ```
+  </Step>
+  
+  <Step title="Check Logs">
+    ```bash
+    # View all logs
+    docker-compose logs
+    
+    # Follow API logs
+    docker-compose logs -f xgp-api
+    
+    # Follow PostgreSQL logs
+    docker-compose logs -f postgres
+    ```
+  </Step>
+  
+  <Step title="Test API">
+    ```bash
+    curl http://localhost:5000/api/Projects
+    ```
+  </Step>
+</Steps>
+
+### Stop Services
+
+```bash
+# Stop containers (preserves volumes)
+docker-compose stop
+
+# Stop and remove containers (preserves volumes)
+docker-compose down
+
+# Stop and remove containers AND volumes (deletes data!)
+docker-compose down -v
+```
+
+<Warning>
+  Using `docker-compose down -v` will **permanently delete** all database data!
+</Warning>
+
+### Rebuild and Restart
+
+```bash
+# Rebuild images and restart
+docker-compose up -d --build
+
+# Force recreation of containers
+docker-compose up -d --force-recreate
+```
+
+## Environment Configuration
+
+### Environment Variables
+
+The API supports configuration via environment variables:
+
+<Accordion title="Database Configuration">
+  ```bash
+  ConnectionStrings__DefaultConnection="Host=postgres;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=YOUR_PASSWORD"
+  ```
+</Accordion>
+
+<Accordion title="JWT Configuration">
+  ```bash
+  Jwt__Issuer="XgpPhotoApi"
+  Jwt__Audience="XgpPhotoClients"
+  Jwt__Key="your-super-secret-key-here"
+  Jwt__ExpMinutes="60"
+  ```
+</Accordion>
+
+<Accordion title="Auth Clients">
+  ```bash
+  AuthClients__0__ClientId="xgp-web"
+  AuthClients__0__ClientSecret="Y0urCl13ntS3cret!2025"
+  AuthClients__0__Description="Frontend Web"
+  
+  AuthClients__1__ClientId="xgp-mobile"
+  AuthClients__1__ClientSecret="Mob1leAppS3cret@2025"
+  AuthClients__1__Description="Mobile App"
+  ```
+</Accordion>
+
+<Accordion title="ASP.NET Core Settings">
+  ```bash
+  ASPNETCORE_ENVIRONMENT="Production"
+  ASPNETCORE_URLS="http://+:8080"
+  ```
+</Accordion>
+
+### Using .env File
+
+Create a `.env` file for environment-specific configuration:
+
+```bash .env
+# Database
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=SecurePassword123!
+POSTGRES_DB=XgpPhotoDb
+
+# API
+ASPNETCORE_ENVIRONMENT=Production
+JWT_KEY=your-super-secret-jwt-key-minimum-32-characters
+JWT_ISSUER=XgpPhotoApi
+JWT_AUDIENCE=XgpPhotoClients
+
+# Clients
+CLIENT_WEB_ID=xgp-web
+CLIENT_WEB_SECRET=Y0urCl13ntS3cret!2025
+```
+
+Reference in `docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+  
+  xgp-api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+```
+
+<Warning>
+  **Never commit `.env` files to version control!** Add to `.gitignore`:
+  ```
+  .env
+  .env.local
+  .env.*.local
+  ```
+</Warning>
+
+## Production Deployment
+
+### Production docker-compose.yml
+
+```yaml docker-compose.prod.yml
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-xgp-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups  # Backup directory
+    networks:
+      - xgp_network
+    # Don't expose port to host in production
+
+  xgp-api:
+    image: your-registry.com/xgp-photo-api:latest
+    container_name: xgp-api-prod
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Prefer"
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__ExpMinutes: "60"
+    depends_on:
+      - postgres
+    networks:
+      - xgp_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  pgdata:
+
+networks:
+  xgp_network:
+    driver: bridge
+```
+
+### Deploy to Production
+
+```bash
+# Build and tag image
+docker build -t your-registry.com/xgp-photo-api:1.0.0 .
+docker build -t your-registry.com/xgp-photo-api:latest .
+
+# Push to registry
+docker push your-registry.com/xgp-photo-api:1.0.0
+docker push your-registry.com/xgp-photo-api:latest
+
+# On production server
+docker-compose -f docker-compose.prod.yml pull
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## Reverse Proxy with Nginx
+
+Use Nginx as a reverse proxy for SSL termination and load balancing:
+
+```nginx nginx.conf
+upstream xgp_api {
+    server localhost:5000;
+}
+
+server {
+    listen 80;
+    server_name api.xgp.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.xgp.com;
+
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_pass http://xgp_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Add Nginx to docker-compose:
+
+```yaml
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-xgp
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - xgp-api
+    networks:
+      - xgp_network
+```
+
+## Health Checks
+
+Implement health check endpoints for monitoring:
+
+```csharp
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description
+            })
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+```
+
+Test health check:
+
+```bash
+curl http://localhost:5000/health
+```
+
+## Monitoring and Logging
+
+### View Logs
+
+```bash
+# Real-time logs
+docker-compose logs -f xgp-api
+
+# Last 100 lines
+docker-compose logs --tail=100 xgp-api
+
+# Logs with timestamps
+docker-compose logs -t xgp-api
+```
+
+### Export Logs
+
+```bash
+# Export to file
+docker-compose logs xgp-api > api-logs.txt
+
+# Export with timestamps
+docker-compose logs -t xgp-api > api-logs-$(date +%Y%m%d).txt
+```
+
+### Log Management
+
+Configure log rotation in docker-compose:
+
+```yaml
+services:
+  xgp-api:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+## Database Backups
+
+### Manual Backup
+
+```bash
+# Backup database
+docker-compose exec postgres pg_dump -U postgres XgpPhotoDb > backup-$(date +%Y%m%d).sql
+
+# Backup with compression
+docker-compose exec postgres pg_dump -U postgres XgpPhotoDb | gzip > backup-$(date +%Y%m%d).sql.gz
+```
+
+### Automated Backups
+
+Add backup service to docker-compose:
+
+```yaml
+services:
+  backup:
+    image: postgres:16
+    container_name: postgres-backup
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: tuPassword
+      POSTGRES_DB: XgpPhotoDb
+      BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
+    volumes:
+      - ./backups:/backups
+      - ./backup-script.sh:/backup-script.sh
+    command: /backup-script.sh
+    depends_on:
+      - postgres
+    networks:
+      - xgp_network
+```
+
+### Restore from Backup
+
+```bash
+# Restore database
+docker-compose exec -T postgres psql -U postgres XgpPhotoDb < backup-20260304.sql
+
+# Restore compressed backup
+gunzip -c backup-20260304.sql.gz | docker-compose exec -T postgres psql -U postgres XgpPhotoDb
+```
+
+## Scaling
+
+### Horizontal Scaling
+
+```bash
+# Scale API to 3 instances
+docker-compose up -d --scale xgp-api=3
+```
+
+**Note:** Requires load balancer configuration.
+
+## Troubleshooting
+
+<Accordion title="Container won't start">
+  ```bash
+  # Check logs
+  docker-compose logs xgp-api
+  
+  # Check container status
+  docker-compose ps
+  
+  # Inspect container
+  docker inspect xgp-api
+  ```
+</Accordion>
+
+<Accordion title="Database connection fails">
+  **Solutions:**
+  - Verify PostgreSQL is running: `docker-compose ps postgres`
+  - Check network: `docker network ls`
+  - Verify connection string uses service name `postgres`, not `localhost`
+  - Check logs: `docker-compose logs postgres`
+</Accordion>
+
+<Accordion title="Port already in use">
+  ```bash
+  # Find process using port
+  lsof -i :5000
+  
+  # Change port in docker-compose.yml
+  ports:
+    - "5001:8080"  # Use different host port
+  ```
+</Accordion>
+
+<Accordion title="Out of disk space">
+  ```bash
+  # Remove unused images
+  docker image prune -a
+  
+  # Remove unused volumes
+  docker volume prune
+  
+  # Remove all unused resources
+  docker system prune -a --volumes
+  ```
+</Accordion>
+
+## Security Best Practices
+
+<Warning>
+  **Production Security Checklist**
+  
+  - Use secrets management (Docker Secrets, Azure Key Vault, AWS Secrets Manager)
+  - Don't expose PostgreSQL port to host in production
+  - Use HTTPS/TLS everywhere
+  - Implement rate limiting
+  - Use strong, unique passwords
+  - Keep Docker and images updated
+  - Run containers as non-root user
+  - Implement network segmentation
+  - Enable Docker Content Trust
+  - Regular security audits
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Setup" icon="database" href="/guides/database-setup">
+    Configure PostgreSQL and migrations
+  </Card>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Secure your API with JWT
+  </Card>
+</CardGroup>

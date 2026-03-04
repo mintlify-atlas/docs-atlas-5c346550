@@ -1,0 +1,586 @@
+---
+title: 'Database Setup'
+description: 'Configure PostgreSQL database and run Entity Framework Core migrations for the XGP Photo API'
+---
+
+## Overview
+
+The XGP Photo API uses **PostgreSQL** as its database with **Entity Framework Core** for data access and migrations. This guide covers:
+
+- PostgreSQL installation and configuration
+- Connection string setup
+- Running Entity Framework migrations
+- Database seeding
+
+## Prerequisites
+
+- PostgreSQL 16 or later
+- .NET 9.0 SDK
+- Entity Framework Core CLI tools
+
+<Note>
+  If you're using Docker, skip to the [Docker Setup](#docker-setup) section for a faster setup.
+</Note>
+
+## PostgreSQL Installation
+
+<Tabs>
+  <Tab title="Windows">
+    1. Download PostgreSQL from [postgresql.org](https://www.postgresql.org/download/windows/)
+    2. Run the installer and follow the setup wizard
+    3. Remember your postgres user password
+    4. Default port is 5432
+  </Tab>
+  
+  <Tab title="macOS">
+    ```bash
+    # Using Homebrew
+    brew install postgresql@16
+    brew services start postgresql@16
+    ```
+  </Tab>
+  
+  <Tab title="Linux (Ubuntu/Debian)">
+    ```bash
+    sudo apt update
+    sudo apt install postgresql postgresql-contrib
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    ```bash
+    docker run --name postgres-xgp \
+      -e POSTGRES_PASSWORD=tuPassword \
+      -e POSTGRES_DB=XgpPhotoDb \
+      -p 5432:5432 \
+      -d postgres:16
+    ```
+  </Tab>
+</Tabs>
+
+## Database Configuration
+
+### Create Database
+
+Connect to PostgreSQL and create the database:
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create database
+CREATE DATABASE "XgpPhotoDb";
+
+# Verify
+\l
+```
+
+### Connection String
+
+Configure the connection string in `appsettings.json`:
+
+```json appsettings.json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword"
+  }
+}
+```
+
+<Warning>
+  **Never commit database passwords to version control!** 
+  
+  Use environment variables or user secrets for sensitive data:
+  ```bash
+  dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=YOUR_PASSWORD"
+  ```
+</Warning>
+
+### DbContext Configuration
+
+The `ApplicationDbContext` extends `IdentityDbContext` for authentication support:
+
+```csharp Data/ApplicationDbContext.cs
+public class ApplicationDbContext : IdentityDbContext<IdentityUser>
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options) { }
+
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectDetail> ProjectDetails => Set<ProjectDetail>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        builder.Entity<Project>(entity =>
+        {
+            entity.ToTable("Projects");
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.Title).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Description).HasMaxLength(1000);
+            entity.Property(p => p.ImageUrl).HasMaxLength(500);
+
+            entity.HasMany(p => p.Details)
+                  .WithOne(d => d.Project)
+                  .HasForeignKey(d => d.ProjectId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ProjectDetail>(entity =>
+        {
+            entity.ToTable("ProjectDetails");
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.ImageUrl).IsRequired().HasMaxLength(500);
+        });
+    }
+}
+```
+
+## Entity Framework Migrations
+
+### Install EF Core Tools
+
+```bash
+# Install globally
+dotnet tool install --global dotnet-ef
+
+# Verify installation
+dotnet ef --version
+```
+
+### Migration History
+
+The API includes these migrations:
+
+<Steps>
+  <Step title="InitIdentity">
+    Creates ASP.NET Identity tables for authentication:
+    - AspNetUsers
+    - AspNetRoles
+    - AspNetUserRoles
+    - AspNetUserClaims
+    - AspNetRoleClaims
+    - AspNetUserLogins
+    - AspNetUserTokens
+  </Step>
+  
+  <Step title="AddProjectsModule">
+    Creates project management tables:
+    - Projects
+    - ProjectDetails (with foreign key to Projects)
+  </Step>
+</Steps>
+
+### InitIdentity Migration
+
+This migration sets up the authentication infrastructure:
+
+```csharp Migrations/20251016083348_InitIdentity.cs
+public partial class InitIdentity : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.CreateTable(
+            name: "AspNetRoles",
+            columns: table => new
+            {
+                Id = table.Column<string>(type: "text", nullable: false),
+                Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                NormalizedName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                ConcurrencyStamp = table.Column<string>(type: "text", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_AspNetRoles", x => x.Id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "AspNetUsers",
+            columns: table => new
+            {
+                Id = table.Column<string>(type: "text", nullable: false),
+                UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                NormalizedEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                PasswordHash = table.Column<string>(type: "text", nullable: true),
+                SecurityStamp = table.Column<string>(type: "text", nullable: true),
+                ConcurrencyStamp = table.Column<string>(type: "text", nullable: true),
+                PhoneNumber = table.Column<string>(type: "text", nullable: true),
+                PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                TwoFactorEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                LockoutEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                LockoutEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                AccessFailedCount = table.Column<int>(type: "integer", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+            });
+        
+        // Additional tables: AspNetUserRoles, AspNetUserClaims, etc.
+    }
+}
+```
+
+### AddProjectsModule Migration
+
+This migration creates the project tables:
+
+```csharp Migrations/20251016120232_AddProjectsModule.cs
+public partial class AddProjectsModule : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.CreateTable(
+            name: "Projects",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                BannerClickTitle = table.Column<string>(type: "text", nullable: false),
+                BannerClickDescription = table.Column<string>(type: "text", nullable: false),
+                Title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                CreateDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                ModifiedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                IsActive = table.Column<bool>(type: "boolean", nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Projects", x => x.Id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "ProjectDetails",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "uuid", nullable: false),
+                ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
+                ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                CreateDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                ModifiedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_ProjectDetails", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_ProjectDetails_Projects_ProjectId",
+                    column: x => x.ProjectId,
+                    principalTable: "Projects",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Cascade);
+            });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_ProjectDetails_ProjectId",
+            table: "ProjectDetails",
+            column: "ProjectId");
+    }
+}
+```
+
+## Running Migrations
+
+### Apply All Migrations
+
+```bash
+# Run from the project directory
+dotnet ef database update
+```
+
+**Expected Output:**
+```
+Build started...
+Build succeeded.
+Applying migration '20251016083348_InitIdentity'.
+Applying migration '20251016120232_AddProjectsModule'.
+Done.
+```
+
+### Verify Migration Status
+
+```bash
+# List applied migrations
+dotnet ef migrations list
+```
+
+### Create New Migration
+
+If you modify entities:
+
+```bash
+# Create migration
+dotnet ef migrations add YourMigrationName
+
+# Apply it
+dotnet ef database update
+```
+
+### Rollback Migration
+
+```bash
+# Rollback to specific migration
+dotnet ef database update PreviousMigrationName
+
+# Remove last migration (if not applied)
+dotnet ef migrations remove
+```
+
+<Warning>
+  Always backup your database before rolling back migrations in production!
+</Warning>
+
+## Database Seeding
+
+### Seed Initial Data
+
+Create admin user and roles on application startup:
+
+```csharp
+public static async Task SeedDatabaseAsync(IServiceProvider services)
+{
+    var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+    // Create roles
+    if (!await roleManager.RoleExistsAsync("Admin"))
+    {
+        await roleManager.CreateAsync(new IdentityRole("Admin"));
+    }
+
+    // Create admin user
+    var adminEmail = "admin@xgp.com";
+    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+    
+    if (adminUser == null)
+    {
+        adminUser = new IdentityUser
+        {
+            UserName = adminEmail,
+            Email = adminEmail,
+            EmailConfirmed = true
+        };
+        
+        var result = await userManager.CreateAsync(adminUser, "Admin123!");
+        
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+    }
+}
+```
+
+Call this in `Program.cs`:
+
+```csharp
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    await DatabaseSeeder.SeedDatabaseAsync(services);
+}
+```
+
+## Docker Setup
+
+Use the provided `docker-compose.yml` for easy setup:
+
+```yaml docker-compose.yml
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-xgp
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: tuPassword
+      POSTGRES_DB: XgpPhotoDb
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256 --auth-local=scram-sha-256'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - xgp_network
+
+  xgp-api:
+    build: .
+    container_name: xgp-api
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword"
+      Jwt__Issuer: "XgpPhotoApi"
+      Jwt__Audience: "XgpPhotoClients"
+      Jwt__Key: "clave-super-segura-y-larga-para-firmar-jwt"
+      Jwt__ExpMinutes: "60"
+    depends_on:
+      - postgres
+    networks:
+      - xgp_network
+
+volumes:
+  pgdata:
+
+networks:
+  xgp_network:
+    driver: bridge
+```
+
+### Start with Docker Compose
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f xgp-api
+
+# Run migrations (the API runs them automatically on startup)
+# Or manually:
+docker-compose exec xgp-api dotnet ef database update
+
+# Stop services
+docker-compose down
+```
+
+<Note>
+  The API automatically applies migrations on startup when running in Development mode.
+</Note>
+
+## Connection String Formats
+
+### Local Development
+
+```
+Host=localhost;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword
+```
+
+### Docker Container
+
+When API runs in Docker, use the service name:
+
+```
+Host=postgres;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=tuPassword
+```
+
+### Production (with SSL)
+
+```
+Host=your-db-host.com;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=SecurePassword;SSL Mode=Require;Trust Server Certificate=true
+```
+
+### Connection Pooling (Production)
+
+```
+Host=your-db-host.com;Port=5432;Database=XgpPhotoDb;Username=postgres;Password=SecurePassword;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100
+```
+
+## Database Schema
+
+### Tables Overview
+
+<Accordion title="Identity Tables (ASP.NET Core Identity)">
+  - **AspNetUsers** - User accounts
+  - **AspNetRoles** - Role definitions (Admin, User, etc.)
+  - **AspNetUserRoles** - User-to-role assignments
+  - **AspNetUserClaims** - Additional user claims
+  - **AspNetRoleClaims** - Role-based claims
+  - **AspNetUserLogins** - External login providers
+  - **AspNetUserTokens** - Authentication tokens
+</Accordion>
+
+<Accordion title="Project Tables">
+  - **Projects** - Photography projects with metadata
+  - **ProjectDetails** - Detail images for each project (1:N relationship)
+</Accordion>
+
+### Entity Relationship Diagram
+
+```
+Projects (1) ----< (N) ProjectDetails
+    |                      |
+    Id (PK)                Id (PK)
+    Title                  ProjectId (FK)
+    Description            ImageUrl
+    ImageUrl               IsActive
+    BannerClickTitle       CreateDate
+    BannerClickDescription ModifiedDate
+    IsActive
+    CreateDate
+    ModifiedDate
+
+AspNetUsers (1) ----< (N) AspNetUserRoles >---- (N) AspNetRoles (1)
+```
+
+## Troubleshooting
+
+<Accordion title="Connection refused">
+  **Error:** `Npgsql.NpgsqlException: Connection refused`
+  
+  **Solutions:**
+  - Verify PostgreSQL is running: `sudo systemctl status postgresql`
+  - Check port is correct (default: 5432)
+  - Verify firewall allows connections
+  - Check pg_hba.conf for authentication settings
+</Accordion>
+
+<Accordion title="Password authentication failed">
+  **Error:** `password authentication failed for user "postgres"`
+  
+  **Solutions:**
+  - Verify password in connection string
+  - Reset PostgreSQL password if needed
+  - Check POSTGRES_PASSWORD environment variable in Docker
+</Accordion>
+
+<Accordion title="Database does not exist">
+  **Error:** `database "XgpPhotoDb" does not exist`
+  
+  **Solutions:**
+  - Create database manually: `CREATE DATABASE "XgpPhotoDb";`
+  - Or let the API create it automatically on first run
+</Accordion>
+
+<Accordion title="Migration already applied">
+  **Error:** `Migration '...' has already been applied`
+  
+  **Solutions:**
+  - Check migration history: `dotnet ef migrations list`
+  - Remove migration if not needed: `dotnet ef migrations remove`
+  - Or specify target migration: `dotnet ef database update TargetMigration`
+</Accordion>
+
+## Best Practices
+
+<Warning>
+  **Production Checklist**
+  
+  - Use SSL/TLS for database connections
+  - Store connection strings in secure configuration (Azure Key Vault, AWS Secrets Manager)
+  - Enable connection pooling
+  - Set up automated backups
+  - Monitor database performance
+  - Use read replicas for high-traffic applications
+  - Implement retry policies for transient failures
+  - Keep PostgreSQL and Npgsql packages updated
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy the API with Docker
+  </Card>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Set up JWT authentication
+  </Card>
+</CardGroup>

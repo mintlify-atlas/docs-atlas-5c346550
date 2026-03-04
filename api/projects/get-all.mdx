@@ -1,0 +1,129 @@
+---
+title: 'Get All Projects'
+description: 'Retrieve all active photography projects'
+---
+
+## Endpoint
+
+```
+GET /api/projects
+```
+
+## Authentication
+
+This endpoint does not require authentication. It is publicly accessible.
+
+## Description
+
+Retrieves all active photography projects. Each project includes its details (images) as a nested collection.
+
+## Response
+
+Returns an array of project objects.
+
+<ResponseField name="id" type="string (GUID)">
+  Unique identifier for the project.
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Project title.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Project description.
+</ResponseField>
+
+<ResponseField name="imageUrl" type="string">
+  URL of the main project image/cover.
+</ResponseField>
+
+<ResponseField name="isActive" type="boolean">
+  Indicates if the project is currently active.
+</ResponseField>
+
+<ResponseField name="createDate" type="string (datetime)">
+  ISO 8601 timestamp when the project was created.
+</ResponseField>
+
+<ResponseField name="details" type="array">
+  Array of project detail objects containing additional images.
+  
+  <Expandable title="ProjectDetailDto properties">
+    <ResponseField name="id" type="string (GUID)">
+      Unique identifier for the detail.
+    </ResponseField>
+    
+    <ResponseField name="imageUrl" type="string">
+      URL of the detail image.
+    </ResponseField>
+    
+    <ResponseField name="isActive" type="boolean">
+      Indicates if the detail is currently active.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET http://localhost:5000/api/projects
+```
+
+## Example Response
+
+### Success (200 OK)
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "title": "Wedding Photography 2024",
+    "description": "Elegant wedding photography collection featuring romantic moments",
+    "imageUrl": "https://example.com/images/wedding-cover.jpg",
+    "isActive": true,
+    "createDate": "2024-10-16T12:00:00Z",
+    "details": [
+      {
+        "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "imageUrl": "https://example.com/images/wedding-1.jpg",
+        "isActive": true
+      },
+      {
+        "id": "8d0e7680-8536-51ef-a55c-f18gd2g01bf8",
+        "imageUrl": "https://example.com/images/wedding-2.jpg",
+        "isActive": true
+      }
+    ]
+  },
+  {
+    "id": "4gb96g75-6828-5673-c4gd-3d074g77bgb7",
+    "title": "Portrait Sessions",
+    "description": "Professional portrait photography sessions",
+    "imageUrl": "https://example.com/images/portrait-cover.jpg",
+    "isActive": true,
+    "createDate": "2024-10-15T10:30:00Z",
+    "details": [
+      {
+        "id": "9e1f8791-9647-62fg-b66d-g29he3h12cg9",
+        "imageUrl": "https://example.com/images/portrait-1.jpg",
+        "isActive": true
+      }
+    ]
+  }
+]
+```
+
+### Empty Result (200 OK)
+
+Returned when no active projects exist:
+
+```json
+[]
+```
+
+## Notes
+
+- This endpoint returns only active projects (where `isActive` is `true`)
+- Each project includes all its associated detail images
+- Results are not paginated
+- No authentication required - this is a public endpoint for displaying photography portfolio

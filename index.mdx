@@ -1,97 +1,283 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: XGP Photo API Documentation
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#0ea5e9] via-[#0284c7] to-[#0c4a6e] dark:from-[#0ea5e9] dark:via-[#0284c7] dark:to-[#0c4a6e] py-20">
+  <div className="max-w-6xl mx-auto px-6 sm:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Photography Project Management API
+        </h1>
+        <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl">
+          A modern REST API for managing photography projects with JWT authentication, role-based access control, and PostgreSQL storage.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 bg-white text-[#0ea5e9] font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Get Started
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+          <a
+            href="/api/overview"
+            className="inline-flex items-center px-6 py-3 border-2 border-white/30 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors"
+          >
+            API Reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5 rounded-2xl blur-xl"></div>
+          <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-red-400"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+              <div className="w-3 h-3 rounded-full bg-green-400"></div>
+            </div>
+            <pre className="text-sm text-white/90 overflow-x-auto">
+{`POST /api/auth/login
+Content-Type: application/json
 
-Get your documentation site up and running in minutes.
+{
+  "email": "admin@xgp.com",
+  "password": "your-password"
+}
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+→ 200 OK
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "email": "admin@xgp.com",
+  "role": "Admin"
+}`}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Quick start</h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Get your API up and running in minutes with these simple steps
+    </p>
+  </div>
 
-Design a docs site that looks great and empowers your users.
+  <Steps>
+    <Step title="Set up PostgreSQL database">
+      Start a PostgreSQL instance using Docker:
+      
+      ```bash
+      docker run --name postgres-xgp \
+        -e POSTGRES_USER=postgres \
+        -e POSTGRES_PASSWORD=tuPassword \
+        -e POSTGRES_DB=XgpPhotoDb \
+        -p 5432:5432 \
+        -d postgres:16
+      ```
+    </Step>
+    
+    <Step title="Configure connection string">
+      Update your `appsettings.json` with the database connection:
+      
+      ```json
+      {
+        "ConnectionStrings": {
+          "DefaultConnection": "Host=localhost;Database=XgpPhotoDb;Username=postgres;Password=tuPassword"
+        },
+        "Jwt": {
+          "Key": "your-secret-key-min-32-characters",
+          "Issuer": "XgpPhotoApi",
+          "Audience": "XgpPhotoClient"
+        }
+      }
+      ```
+    </Step>
+    
+    <Step title="Run the API">
+      Start the application and run migrations:
+      
+      ```bash
+      dotnet restore
+      dotnet ef database update
+      dotnet run
+      ```
+      
+      The API will be available at `http://localhost:5000` with Swagger UI at `/swagger`.
+    </Step>
+    
+    <Step title="Make your first request">
+      Authenticate and get a JWT token:
+      
+      ```bash
+      curl -X POST http://localhost:5000/api/auth/login \
+        -H "Content-Type: application/json" \
+        -d '{
+          "email": "admin@xgp.com",
+          "password": "Admin123!"
+        }'
+      ```
+      
+      Use the returned token to access protected endpoints.
+    </Step>
+  </Steps>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Key features</h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Everything you need to build a photography project management system
+    </p>
+  </div>
 
-## Create beautiful pages
+  <CardGroup cols={3}>
+    <Card title="JWT Authentication" icon="shield-halved" href="/guides/authentication">
+      Secure authentication with role-based authorization (Admin/User roles)
+    </Card>
+    <Card title="Project Management" icon="camera" href="/guides/projects">
+      Create and manage photography projects with image galleries and metadata
+    </Card>
+    <Card title="PostgreSQL Storage" icon="database" href="/guides/database-setup">
+      Robust data persistence with Entity Framework Core migrations
+    </Card>
+    <Card title="Clean Architecture" icon="layer-group" href="/introduction">
+      Organized codebase with separation of concerns (API/Application/Domain/Infrastructure)
+    </Card>
+    <Card title="Swagger Documentation" icon="book-open" href="/api/overview">
+      Interactive API documentation with built-in testing capabilities
+    </Card>
+    <Card title="Docker Ready" icon="docker" href="/guides/deployment">
+      Containerized deployment with Docker and docker-compose support
+    </Card>
+  </CardGroup>
+</div>
 
-Everything you need to create world-class documentation.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Explore the API</h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Comprehensive documentation for every endpoint
+    </p>
+  </div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a href="/api/auth/login" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#0ea5e9] dark:hover:border-[#0ea5e9] transition-colors overflow-hidden no-underline">
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-[#0ea5e9]/10 dark:bg-[#0ea5e9]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#0ea5e9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <span className="px-2 py-1 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">POST</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">/api/auth/login</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Authenticate users and receive a JWT token for accessing protected endpoints
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#0ea5e9] group-hover:gap-2 transition-all">
+          View endpoint
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-## Need inspiration?
+    <a href="/api/projects/get-all" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#0ea5e9] dark:hover:border-[#0ea5e9] transition-colors overflow-hidden no-underline">
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-[#0ea5e9]/10 dark:bg-[#0ea5e9]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#0ea5e9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <span className="px-2 py-1 text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">GET</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">/api/projects</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Retrieve all active photography projects with their details and image galleries
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#0ea5e9] group-hover:gap-2 transition-all">
+          View endpoint
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    <a href="/api/projects/create" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#0ea5e9] dark:hover:border-[#0ea5e9] transition-colors overflow-hidden no-underline">
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-[#0ea5e9]/10 dark:bg-[#0ea5e9]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#0ea5e9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+          <span className="px-2 py-1 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">POST</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">/api/projects</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Create new photography projects with metadata and image collections (Admin only)
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#0ea5e9] group-hover:gap-2 transition-all">
+          View endpoint
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/api/projects/update" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#1a1d27] hover:border-[#0ea5e9] dark:hover:border-[#0ea5e9] transition-colors overflow-hidden no-underline">
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-[#0ea5e9]/10 dark:bg-[#0ea5e9]/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#0ea5e9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </div>
+          <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded">PUT</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">/api/projects/:id</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Update existing projects and their associated details (Admin only)
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#0ea5e9] group-hover:gap-2 transition-all">
+          View endpoint
+          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-r from-[#0ea5e9] to-[#0284c7] dark:from-[#0ea5e9] dark:to-[#0284c7] rounded-2xl p-8 sm:p-12 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">Ready to get started?</h2>
+    <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
+      Build your photography project management system with our comprehensive API. Follow the quickstart guide to have your first project created in minutes.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center px-8 py-4 bg-white text-[#0ea5e9] font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+    >
+      Get Started Now
+      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    </a>
+  </div>
+</div>

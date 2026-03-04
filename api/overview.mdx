@@ -1,0 +1,134 @@
+---
+title: 'API Overview'
+description: 'Learn how to interact with the XGP Photo API'
+---
+
+## Base URL
+
+All API requests should be made to:
+
+```
+http://localhost:5000/api
+```
+
+For production environments, replace with your production base URL.
+
+## Authentication
+
+The XGP Photo API uses JWT (JSON Web Token) authentication. Protected endpoints require a valid JWT token obtained through the `/api/auth/login` endpoint.
+
+### Authentication Header Format
+
+Include the JWT token in the `Authorization` header of your requests:
+
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+### Obtaining a Token
+
+To obtain a JWT token, send a POST request to `/api/auth/login` with valid credentials and client information. See the [Login endpoint documentation](/api/auth/login) for details.
+
+### Token Expiration
+
+Tokens are valid for 60 minutes by default. After expiration, you'll need to request a new token by logging in again.
+
+## Authorization Roles
+
+Some endpoints require specific roles:
+
+- **Admin**: Full access to create and update projects
+- **Anonymous**: Public access to read-only endpoints
+
+## Request Format
+
+All POST and PUT requests should include a `Content-Type: application/json` header with a JSON request body.
+
+## Response Format
+
+All responses are returned in JSON format with appropriate HTTP status codes.
+
+### Success Responses
+
+- `200 OK`: Request successful
+- `201 Created`: Resource created successfully
+
+### Error Responses
+
+The API uses standard HTTP status codes to indicate errors:
+
+#### 400 Bad Request
+
+Returned when the request is malformed or validation fails.
+
+```json
+{
+  "errors": {
+    "Title": [
+      "The Title field is required."
+    ],
+    "ImageUrl": [
+      "The ImageUrl field is required."
+    ]
+  },
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400
+}
+```
+
+#### 401 Unauthorized
+
+Returned when authentication fails or token is invalid/missing.
+
+```json
+"Credenciales inválidas o cliente no autorizado."
+```
+
+or when accessing a protected endpoint without authentication:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}
+```
+
+#### 403 Forbidden
+
+Returned when the authenticated user lacks required permissions.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+  "title": "Forbidden",
+  "status": 403
+}
+```
+
+#### 404 Not Found
+
+Returned when the requested resource doesn't exist.
+
+```json
+{
+  "message": "No se encontró el proyecto con Id 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+}
+```
+
+#### 500 Internal Server Error
+
+Returned when an unexpected server error occurs.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+  "title": "An error occurred while processing your request.",
+  "status": 500
+}
+```
+
+## CORS
+
+The API supports Cross-Origin Resource Sharing (CORS) and allows requests from any origin with any headers and methods.

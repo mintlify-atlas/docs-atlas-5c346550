@@ -1,0 +1,395 @@
+---
+title: 'Authentication & Authorization'
+description: 'Learn how to implement JWT authentication and role-based authorization in the XGP Photo API'
+---
+
+## Overview
+
+The XGP Photo API uses JWT (JSON Web Tokens) for authentication combined with a client credentials validation system. This provides a two-layer security approach:
+
+1. **Client validation** - Validates the client application using ClientId and ClientSecret
+2. **User authentication** - Validates user credentials and generates JWT tokens
+3. **Role-based authorization** - Controls access to endpoints based on user roles
+
+## Authentication Flow
+
+<Steps>
+  <Step title="Client Registration">
+    Register your client application in `appsettings.json`:
+
+    ```json
+    "AuthClients": [
+      {
+        "ClientId": "xgp-web",
+        "ClientSecret": "Y0urCl13ntS3cret!2025",
+        "Description": "Frontend Web principal"
+      },
+      {
+        "ClientId": "xgp-mobile",
+        "ClientSecret": "Mob1leAppS3cret@2025",
+        "Description": "Aplicación móvil"
+      }
+    ]
+    ```
+  </Step>
+
+  <Step title="Login Request">
+    Send a POST request to `/api/Auth/login` with user and client credentials:
+
+    ```json
+    {
+      "email": "admin@xgp.com",
+      "password": "YourPassword123!",
+      "clientId": "xgp-web",
+      "clientSecret": "Y0urCl13ntS3cret!2025"
+    }
+    ```
+  </Step>
+
+  <Step title="Receive JWT Token">
+    On successful authentication, you'll receive a JWT token:
+
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    ```
+  </Step>
+
+  <Step title="Use Token in Requests">
+    Include the token in the Authorization header:
+
+    ```bash
+    curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+      https://api.xgp.com/api/Projects
+    ```
+  </Step>
+</Steps>
+
+## JWT Configuration
+
+JWT settings are configured in `appsettings.json`:
+
+```json
+"Jwt": {
+  "Issuer": "XgpPhotoApi",
+  "Audience": "XgpPhotoClients",
+  "Key": "clave-super-segura-y-larga-para-firmar-jwt",
+  "ExpMinutes": 60
+}
+```
+
+<Warning>
+  Never commit your JWT secret key to version control. Use environment variables or secure configuration management in production.
+</Warning>
+
+### JWT Options Class
+
+The JWT configuration is mapped to the `JwtOptions` class:
+
+```csharp Infrastructure/Identity/JwtOptions.cs
+public class JwtOptions
+{
+    public string Issuer { get; set; } = default!;
+    public string Audience { get; set; } = default!;
+    public string Key { get; set; } = default!;
+    public int ExpMinutes { get; set; } = 60;
+}
+```
+
+## Token Generation
+
+The `JwtTokenService` class handles JWT token creation with user claims and roles:
+
+```csharp Infrastructure/Identity/JwtTokenService.cs
+public class JwtTokenService : ITokenService
+{
+    private readonly JwtOptions _options;
+    private readonly UserManager<IdentityUser> _userManager;
+
+    public async Task<string> CreateTokenAsync(IdentityUser user)
+    {
+        var roles = await _userManager.GetRolesAsync(user);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
+            new(ClaimTypes.Name, user.UserName ?? "")
+        };
+
+        // Add both claim types for maximum compatibility
+        claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        claims.AddRange(roles.Select(r => new Claim("role", r)));
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: _options.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(_options.ExpMinutes),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}
+```
+
+<Note>
+  The service adds roles in two formats (`ClaimTypes.Role` and `"role"`) to ensure compatibility with both .NET standard and plain JWT parsers.
+</Note>
+
+## Client Validation
+
+Before authenticating users, the API validates the client application credentials:
+
+```csharp Infrastructure/Identity/AuthClientValidator.cs
+public class AuthClientValidator : IAuthClientValidator
+{
+    private readonly IReadOnlyList<AuthClient> _clients;
+
+    public AuthClientValidator(IOptions<List<AuthClient>> options)
+    {
+        _clients = options.Value;
+    }
+
+    public bool Validate(string clientId, string clientSecret)
+    {
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            return false;
+
+        return _clients.Any(c =>
+            c.ClientId.Equals(clientId, StringComparison.OrdinalIgnoreCase) &&
+            c.ClientSecret == clientSecret);
+    }
+}
+```
+
+## Authentication Service
+
+The `AuthService` orchestrates the complete authentication flow:
+
+```csharp Application/Services/AuthService.cs
+public async Task<AuthResponseDto?> AuthenticateAsync(LoginDto dto)
+{
+    var clientID = dto.ClientId.Trim();
+    var clientSecret = dto.ClientSecret.Trim();
+
+    // Step 1: Validate client credentials
+    if (!_clientValidator.Validate(clientID, clientSecret))
+        return null;
+
+    // Step 2: Find user by email
+    var user = await _userManager.FindByEmailAsync(dto.Email.ToLower());
+    if (user == null)
+        return null;
+
+    // Step 3: Check password
+    var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, false);
+    if (!result.Succeeded)
+        return null;
+
+    // Step 4: Generate JWT token
+    var token = await _tokenService.CreateTokenAsync(user);
+    var roles = await _userManager.GetRolesAsync(user);
+
+    return new AuthResponseDto
+    {
+        Token = token
+    };
+}
+```
+
+## Auth Controller
+
+The login endpoint is exposed through the `AuthController`:
+
+```csharp Api/Controllers/AuthController.cs
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
+
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var result = await _authService.AuthenticateAsync(dto);
+        if (result == null)
+        {
+            _logger.LogWarning("Intento de login fallido para {Email}", dto.Email);
+            return Unauthorized("Credenciales inválidas o cliente no autorizado.");
+        }
+
+        _logger.LogInformation("Usuario {Email} autenticado correctamente.", dto.Email);
+        return Ok(result);
+    }
+}
+```
+
+## Role-Based Authorization
+
+### Protecting Endpoints
+
+Use the `[Authorize]` attribute with roles to restrict access:
+
+```csharp
+[HttpPost]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> Create([FromBody] ProjectCreateDto dto)
+{
+    var result = await _service.CreateAsync(dto);
+    return CreatedAtAction(nameof(GetAll), new { id = result.Id }, result);
+}
+```
+
+### Available Role Configurations
+
+<Accordion title="Single Role">
+  ```csharp
+  [Authorize(Roles = "Admin")]
+  ```
+  Only users with the Admin role can access this endpoint.
+</Accordion>
+
+<Accordion title="Multiple Roles (OR logic)">
+  ```csharp
+  [Authorize(Roles = "Admin,Editor")]
+  ```
+  Users with either Admin or Editor role can access this endpoint.
+</Accordion>
+
+<Accordion title="Multiple Roles (AND logic)">
+  ```csharp
+  [Authorize(Roles = "Admin")]
+  [Authorize(Roles = "Manager")]
+  ```
+  Only users with both Admin and Manager roles can access this endpoint.
+</Accordion>
+
+<Accordion title="Public Endpoint">
+  ```csharp
+  [AllowAnonymous]
+  ```
+  No authentication required.
+</Accordion>
+
+## Service Registration
+
+Register authentication services in your dependency injection container:
+
+```csharp Infrastructure/Extensions/AuthenticationExtensions.cs
+public static IServiceCollection AddAuthInfrastructure(
+    this IServiceCollection services, 
+    IConfiguration config)
+{
+    services.Configure<JwtOptions>(config.GetSection("Jwt"));
+    services.Configure<List<AuthClient>>(config.GetSection("AuthClients"));
+
+    services.AddScoped<IAuthClientValidator, AuthClientValidator>();
+    services.AddScoped<ITokenService, JwtTokenService>();
+    services.AddScoped<IAuthService, AuthService>();
+
+    return services;
+}
+```
+
+## Testing Authentication
+
+### Using cURL
+
+```bash
+# Login
+curl -X POST http://localhost:5000/api/Auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@xgp.com",
+    "password": "Admin123!",
+    "clientId": "xgp-web",
+    "clientSecret": "Y0urCl13ntS3cret!2025"
+  }'
+
+# Use token in subsequent requests
+curl -X GET http://localhost:5000/api/Projects \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Using Postman
+
+<Steps>
+  <Step title="Create Login Request">
+    - Method: POST
+    - URL: `http://localhost:5000/api/Auth/login`
+    - Body: Raw JSON with email, password, clientId, and clientSecret
+  </Step>
+
+  <Step title="Save Token">
+    Copy the token from the response
+  </Step>
+
+  <Step title="Add to Authorization">
+    - Type: Bearer Token
+    - Token: Paste your JWT token
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+<Warning>
+  **Production Security Checklist**
+  
+  - Use environment variables for sensitive configuration
+  - Implement HTTPS/TLS for all API endpoints
+  - Use strong, randomly generated keys (at least 256 bits)
+  - Implement token refresh mechanism
+  - Add rate limiting to login endpoint
+  - Log authentication failures for security monitoring
+  - Implement account lockout after failed attempts
+  - Use secure password hashing (ASP.NET Identity handles this)
+</Warning>
+
+## Common Issues
+
+<Accordion title="401 Unauthorized">
+  **Possible causes:**
+  - Invalid or expired JWT token
+  - Missing Authorization header
+  - Incorrect bearer token format
+  
+  **Solution:** Verify token is valid and properly formatted: `Bearer YOUR_TOKEN`
+</Accordion>
+
+<Accordion title="403 Forbidden">
+  **Possible causes:**
+  - User doesn't have required role
+  - Token is valid but lacks necessary permissions
+  
+  **Solution:** Check user roles in database and endpoint role requirements
+</Accordion>
+
+<Accordion title="Client validation fails">
+  **Possible causes:**
+  - ClientId or ClientSecret mismatch
+  - Client not registered in appsettings.json
+  
+  **Solution:** Verify client credentials match configuration exactly
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Projects" icon="folder" href="/guides/projects">
+    Learn how to manage photography projects
+  </Card>
+  <Card title="Database Setup" icon="database" href="/guides/database-setup">
+    Configure PostgreSQL and run migrations
+  </Card>
+</CardGroup>

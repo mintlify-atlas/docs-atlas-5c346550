@@ -1,0 +1,117 @@
+---
+title: 'Login'
+description: 'Authenticate and obtain a JWT token'
+---
+
+## Endpoint
+
+```
+POST /api/auth/login
+```
+
+## Authentication
+
+This endpoint does not require authentication. It is publicly accessible.
+
+## Description
+
+Authenticates a user with email, password, and client credentials. Returns a JWT token upon successful authentication.
+
+The authentication process validates:
+1. User credentials (email and password)
+2. Client credentials (clientId and clientSecret)
+
+Both must be valid for authentication to succeed.
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's email address. Must be a valid email format.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password.
+</ParamField>
+
+<ParamField body="clientId" type="string" required>
+  Client application identifier. Used to validate the requesting application.
+</ParamField>
+
+<ParamField body="clientSecret" type="string" required>
+  Client application secret key. Must match the clientId for validation.
+</ParamField>
+
+## Response
+
+<ResponseField name="token" type="string">
+  JWT authentication token. Use this token in the `Authorization` header for protected endpoints.
+  
+  Token format: `Bearer YOUR_JWT_TOKEN`
+  
+  Default expiration: 60 minutes
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@xgp.com",
+    "password": "Admin123!",
+    "clientId": "xgp-web-client",
+    "clientSecret": "xgp-secret-key-2024"
+  }'
+```
+
+## Example Response
+
+### Success (200 OK)
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkB4Z3AuY29tIiwianRpIjoiZjg5NGE3MjAtMTIzNC00NTY3LTg5MGEtYmNkZWYxMjM0NTY3IiwiZW1haWwiOiJhZG1pbkB4Z3AuY29tIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzI5MDg2MDAwLCJleHAiOjE3MjkwODk2MDAsImlhdCI6MTcyOTA4NjAwMCwiaXNzIjoieGdwLXBob3RvLWFwaSIsImF1ZCI6InhncC1waG90by1jbGllbnQifQ.example_signature_here"
+}
+```
+
+### Error (401 Unauthorized)
+
+Returned when credentials are invalid or client is not authorized:
+
+```json
+"Credenciales inválidas o cliente no autorizado."
+```
+
+### Error (400 Bad Request)
+
+Returned when request validation fails:
+
+```json
+{
+  "errors": {
+    "Email": [
+      "The Email field is required.",
+      "The Email field is not a valid e-mail address."
+    ],
+    "Password": [
+      "The Password field is required."
+    ],
+    "ClientId": [
+      "The ClientId field is required."
+    ],
+    "ClientSecret": [
+      "The ClientSecret field is required."
+    ]
+  },
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400
+}
+```
+
+## Notes
+
+- The JWT token must be included in the `Authorization` header as `Bearer YOUR_JWT_TOKEN` for all protected endpoints
+- Tokens expire after 60 minutes by default
+- Invalid client credentials will result in authentication failure even if user credentials are correct
+- All authentication attempts are logged for security monitoring
