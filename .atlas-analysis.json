@@ -1,0 +1,74 @@
+{
+  "projectType": "api-service",
+  "projectName": "XGP Photo API",
+  "projectDescription": "REST API for managing photography projects with JWT authentication and PostgreSQL storage",
+  "theme": "palm",
+  "primaryColor": "#0ea5e9",
+  "lightColor": "#38bdf8",
+  "darkColor": "#0284c7",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/authentication",
+              "guides/projects",
+              "guides/database-setup",
+              "guides/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/login"
+            ]
+          },
+          {
+            "group": "Projects",
+            "pages": [
+              "api/projects/get-all",
+              "api/projects/get-by-id",
+              "api/projects/create",
+              "api/projects/update"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication with role-based authorization",
+    "RESTful API for managing photography projects",
+    "PostgreSQL database with Entity Framework Core",
+    "Swagger/OpenAPI documentation",
+    "Docker containerization support"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/login",
+    "GET /api/projects",
+    "GET /api/projects/{id}",
+    "POST /api/projects",
+    "PUT /api/projects/{id}"
+  ]
+}
